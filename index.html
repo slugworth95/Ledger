@@ -318,6 +318,13 @@ The first line becomes the title." spellcheck="true" hidden></textarea>
   </div>
 </div>
 
+<div class="sheet" id="sheet3" role="dialog" aria-modal="true" aria-labelledby="s3h">
+  <h2 id="s3h"><span class="sq"></span> Import a note</h2>
+  <div class="body" id="driveFileList">
+    <button class="opt" data-a="imp-device"><span class="ext">file</span><span class="txt"><strong>From this device</strong><span>Pick a file from your computer or phone.</span></span></button>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="drop" id="drop">Drop to import</div>
 <input type="file" id="file" accept=".html,.htm,.json,.md,.txt,.markdown,text/*" multiple hidden>
@@ -355,7 +362,7 @@ const $ = s => document.querySelector(s);
 const el = {
   list:$("#list"), ed:$("#ed"), meta:$("#meta"), blank:$("#blank"),
   mDate:$("#mDate"), mSize:$("#mSize"), q:$("#q"), toast:$("#toast"),
-  scrim:$("#scrim"), s1:$("#sheet1"), s2:$("#sheet2"), drop:$("#drop"), file:$("#file"),
+  scrim:$("#scrim"), s1:$("#sheet1"), s2:$("#sheet2"), s3:$("#sheet3"), drop:$("#drop"), file:$("#file"),
   toolbar:$("#toolbar"), preview:$("#preview"), previewPane:$("#previewPane"), drive:$("#drive")
 };
 let previewOn = false;
@@ -541,8 +548,10 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 let tokenClient = null;
 let driveToken = null;
 let driveFileId = null;
+let driveFolderId = null;
 let driveSyncTimer = null;
 try { driveFileId = localStorage.getItem("ledger:driveFileId") || null; } catch(e){}
+try { driveFolderId = localStorage.getItem("ledger:driveFolderId") || null; } catch(e){}
 
 function updateDriveUI(connected){
   el.drive.classList.toggle("on", connected);
@@ -614,11 +623,47 @@ function multipartBody(meta, mime, text){
   };
 }
 
+async function ensureDriveFolder(){
+  if (driveFolderId) return driveFolderId;
+  try {
+    const res = await driveFetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name: "Ledger", mimeType: "application/vnd.google-apps.folder"})
+    });
+    if (!res.ok) throw new Error("folder create failed");
+    const data = await res.json();
+    driveFolderId = data.id;
+    try { localStorage.setItem("ledger:driveFolderId", driveFolderId); } catch(e){}
+    return driveFolderId;
+  } catch(e){
+    return null;
+  }
+}
+
+async function listDriveFiles(){
+  const folderId = await ensureDriveFolder();
+  if (!folderId) return [];
+  try {
+    const q = encodeURIComponent("'" + folderId + "' in parents and trashed = false");
+    const fields = encodeURIComponent("files(id,name,modifiedTime)");
+    const res = await driveFetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=" + fields + "&orderBy=modifiedTime desc");
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.files || [];
+  } catch(e){
+    return [];
+  }
+}
+
 async function uploadToDrive(name, text, mime){
   const ok = await ensureDrive(true);
   if (!ok) return false;
   try {
-    const {boundary, body} = multipartBody({name, mimeType: mime}, mime, text);
+    const folderId = await ensureDriveFolder();
+    const meta = {name, mimeType: mime};
+    if (folderId) meta.parents = [folderId];
+    const {boundary, body} = multipartBody(meta, mime, text);
     const res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
       method: "POST",
       headers: {"Content-Type": "multipart/related; boundary=" + boundary},
@@ -652,7 +697,10 @@ async function driveSyncNow(){
       });
       if (!res.ok) throw new Error("update failed");
     } else {
-      const {boundary, body: mpBody} = multipartBody({name: "ledger-backup.json", mimeType: "application/json"}, "application/json", body);
+      const folderId = await ensureDriveFolder();
+      const meta = {name: "ledger-backup.json", mimeType: "application/json"};
+      if (folderId) meta.parents = [folderId];
+      const {boundary, body: mpBody} = multipartBody(meta, "application/json", body);
       res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
         method: "POST",
         headers: {"Content-Type": "multipart/related; boundary=" + boundary},
@@ -874,31 +922,30 @@ function stripHTML(html){
   return (doc.body ? doc.body.innerText || doc.body.textContent : "").replace(/\n{3,}/g,"\n\n").trim();
 }
 
-async function importFiles(files){
-  let added = 0, skipped = 0;
-  for (const f of files){
-    let raw;
-    try { raw = await f.text(); } catch(e){ skipped++; continue; }
-    const name = f.name.toLowerCase();
-    let incoming = null;
-
-    if (name.endsWith(".json")){
-      try{
-        const d = JSON.parse(raw);
-        incoming = Array.isArray(d) ? d : (Array.isArray(d.notes) ? d.notes : null);
-      }catch(e){ incoming = null; }
-    } else if (name.endsWith(".html") || name.endsWith(".htm") || /^\s*<!doctype html/i.test(raw)){
-      incoming = readPayload(raw);
-      if (!incoming){
-        const t = stripHTML(raw);
-        incoming = t ? [{text:t}] : null;
-      }
-    } else {
-      incoming = raw.trim() ? [{text: raw}] : null;
+function parseIncoming(name, raw){
+  name = name.toLowerCase();
+  let incoming = null;
+  if (name.endsWith(".json")){
+    try{
+      const d = JSON.parse(raw);
+      incoming = Array.isArray(d) ? d : (Array.isArray(d.notes) ? d.notes : null);
+    }catch(e){ incoming = null; }
+  } else if (name.endsWith(".html") || name.endsWith(".htm") || /^\s*<!doctype html/i.test(raw)){
+    incoming = readPayload(raw);
+    if (!incoming){
+      const t = stripHTML(raw);
+      incoming = t ? [{text:t}] : null;
     }
+  } else {
+    incoming = raw.trim() ? [{text: raw}] : null;
+  }
+  return incoming;
+}
 
+async function addIncomingNotes(lists){
+  let added = 0, skipped = 0;
+  for (const incoming of lists){
     if (!incoming || !incoming.length){ skipped++; continue; }
-
     for (const n of incoming){
       const text = typeof n === "string" ? n : (n.text || n.body || n.content || "");
       if (!text.trim()) continue;
@@ -915,6 +962,27 @@ async function importFiles(files){
   await persist(); render();
   if (added) toast("Imported " + added + " note" + (added===1?"":"s"));
   else toast(skipped ? "Nothing readable in that file" : "Nothing new to import");
+}
+
+async function importFiles(files){
+  const lists = [];
+  for (const f of files){
+    let raw;
+    try { raw = await f.text(); } catch(e){ lists.push(null); continue; }
+    lists.push(parseIncoming(f.name, raw));
+  }
+  await addIncomingNotes(lists);
+}
+
+async function importFromDrive(fileId, name){
+  try{
+    const res = await driveFetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
+    if (!res.ok) throw new Error("fetch failed");
+    const raw = await res.text();
+    await addIncomingNotes([parseIncoming(name, raw)]);
+  }catch(e){
+    toast("Couldn't import from Drive");
+  }
 }
 
 /* ============ sheets ============ */
@@ -955,6 +1023,8 @@ document.addEventListener("click", async e => {
       JSON.stringify({kind:"ledger", version:1, exported:Date.now(), notes}, null, 2), "application/json");
   if (a === "all-md")    download("notebook-" + stamp + ".md", bookMD(notes), "text/markdown");
   if (a === "all-drive") await uploadToDrive("notebook-" + stamp + ".html", bookHTML(notes), "text/html");
+  if (a === "imp-device") el.file.click();
+  if (a === "imp-drive")  await importFromDrive(opt.dataset.id, opt.dataset.name);
 });
 
 /* ============ wiring ============ */
@@ -1035,7 +1105,18 @@ $("#exp").addEventListener("click", () => {
   if (!notes.length) return toast("No notes to export yet");
   showSheet(el.s2);
 });
-$("#imp").addEventListener("click", () => el.file.click());
+$("#imp").addEventListener("click", async () => {
+  if (!driveToken){ el.file.click(); return; }
+  const list = document.getElementById("driveFileList");
+  list.innerHTML = '<div class="empty"><b>Loading Drive files…</b></div>';
+  showSheet(el.s3);
+  const files = await listDriveFiles();
+  list.innerHTML =
+    '<button class="opt" data-a="imp-device"><span class="ext">file</span><span class="txt"><strong>From this device</strong><span>Pick a file from your computer or phone.</span></span></button>' +
+    files.map(f => '<button class="opt" data-a="imp-drive" data-id="' + f.id + '" data-name="' + esc(f.name) + '"><span class="ext">drive</span><span class="txt"><strong>' + esc(f.name) + '</strong><span>' + when(new Date(f.modifiedTime).getTime()) + '</span></span></button>').join("");
+  const firstOpt = list.querySelector(".opt");
+  if (firstOpt && openSheet === el.s3) firstOpt.focus();
+});
 el.file.addEventListener("change", e => {
   if (e.target.files.length) importFiles([...e.target.files]);
   e.target.value = "";
