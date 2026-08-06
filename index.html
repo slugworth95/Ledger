@@ -14,7 +14,7 @@
   --wash:#DEDED6;
   --rule:#C8C9C0;
   --ink:#191A17;
-  --graphite:#6C6E68;
+  --graphite:#5A5C56;
   --slate:#22262B;
   --stamp:#8C2F39;
   --stamp-soft:rgba(140,47,57,.10);
@@ -200,26 +200,26 @@ textarea{
 <body class="browsing">
 
 <div class="bar">
-  <button class="ibtn backbtn" id="back" aria-label="All notes">
-    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  <button class="ibtn backbtn" id="back" aria-label="All notes" title="All notes">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
   </button>
   <div class="brand">Ledger<b>.</b></div>
   <div class="spacer"></div>
   <button class="ibtn" id="imp" aria-label="Import file" title="Import">
-    <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
   </button>
   <button class="ibtn" id="exp" aria-label="Export" title="Export">
-    <svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v12M7 11l5 5 5-5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
   </button>
   <button class="ibtn" id="theme" aria-label="Switch theme" title="Theme">
-    <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 109 9 7 7 0 01-9-9z"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 109 9 7 7 0 01-9-9z"/></svg>
   </button>
 </div>
 
 <div class="wrap">
-  <nav class="index" id="index">
+  <nav class="index" id="index" aria-label="Notes list">
     <div class="search">
-      <input id="q" type="search" placeholder="Search notes" autocomplete="off" spellcheck="false">
+      <input id="q" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off" spellcheck="false">
     </div>
     <div class="list" id="list"></div>
     <button class="newbtn" id="new">＋ New note</button>
@@ -235,7 +235,7 @@ textarea{
       <button class="plain" id="del" title="Delete">Delete</button>
       <button class="act" id="ship">Export</button>
     </div>
-    <textarea id="ed" placeholder="Start typing.
+    <textarea id="ed" aria-label="Note text" placeholder="Start typing.
 
 The first line becomes the title." spellcheck="true" hidden></textarea>
     <div class="noselect" id="blank">
@@ -246,8 +246,8 @@ The first line becomes the title." spellcheck="true" hidden></textarea>
 
 <div class="scrim" id="scrim"></div>
 
-<div class="sheet" id="sheet1">
-  <h2><span class="sq"></span> Export this note</h2>
+<div class="sheet" id="sheet1" role="dialog" aria-modal="true" aria-labelledby="s1h">
+  <h2 id="s1h"><span class="sq"></span> Export this note</h2>
   <div class="body">
     <button class="opt" data-a="one-html"><span class="ext">.html</span><span class="txt"><strong>Readable web page</strong><span>Opens in any browser, works offline, and Ledger can re-import it later. The recommended way to move a note around.</span></span></button>
     <button class="opt" data-a="one-md"><span class="ext">.md</span><span class="txt"><strong>Markdown</strong><span>Plain text for Obsidian, git, or anything else.</span></span></button>
@@ -256,8 +256,8 @@ The first line becomes the title." spellcheck="true" hidden></textarea>
   </div>
 </div>
 
-<div class="sheet" id="sheet2">
-  <h2><span class="sq"></span> Export everything</h2>
+<div class="sheet" id="sheet2" role="dialog" aria-modal="true" aria-labelledby="s2h">
+  <h2 id="s2h"><span class="sq"></span> Export everything</h2>
   <div class="body">
     <button class="opt" data-a="all-html"><span class="ext">.html</span><span class="txt"><strong>Whole notebook as one page</strong><span>Every note in a single file with its own search. Readable anywhere, and re-importable.</span></span></button>
     <button class="opt" data-a="all-json"><span class="ext">.json</span><span class="txt"><strong>Backup file</strong><span>Exact data, for restoring into Ledger.</span></span></button>
@@ -265,7 +265,7 @@ The first line becomes the title." spellcheck="true" hidden></textarea>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="drop" id="drop">Drop to import</div>
 <input type="file" id="file" accept=".html,.htm,.json,.md,.txt,.markdown,text/*" multiple hidden>
 
@@ -401,7 +401,8 @@ function render(){
   } else {
     el.list.innerHTML = shown.map(n => {
       const body = (n.text||"").split("\n").slice(1).join(" ").trim();
-      return '<button class="row' + (current === n.id ? " on" : "") + '" data-id="' + n.id + '">' +
+      return '<button class="row' + (current === n.id ? " on" : "") + '" data-id="' + n.id + '"' +
+        (current === n.id ? ' aria-current="true"' : '') + '>' +
         '<div class="t">' + esc(titleOf(n.text)) + "</div>" +
         '<div class="m"><span>' + when(n.updated) + '</span><span class="dot">·</span><span>' +
         bytes(size(n.text)) + "</span></div></button>";
@@ -425,8 +426,16 @@ function queueSave(){
   saveTimer = setTimeout(persist, 350);
 }
 
-function open(id){
+function setCurrent(id){
   current = id;
+  try {
+    if (id) localStorage.setItem("ledger:current", id);
+    else localStorage.removeItem("ledger:current");
+  } catch(e){}
+}
+
+function open(id){
+  setCurrent(id);
   document.body.classList.remove("browsing");
   render();
   if (window.innerWidth > 720) el.ed.focus();
@@ -434,7 +443,7 @@ function open(id){
 
 function newNote(text){
   const n = {id:uid(), text:text||"", created:Date.now(), updated:Date.now()};
-  notes.push(n); current = n.id;
+  notes.push(n); setCurrent(n.id);
   document.body.classList.remove("browsing");
   persist(); render();
   return n;
@@ -660,12 +669,17 @@ async function importFiles(files){
 
 /* ============ sheets ============ */
 let openSheet = null;
+let sheetTrigger = null;
 function showSheet(s){
+  sheetTrigger = document.activeElement;
   openSheet = s; s.classList.add("on"); el.scrim.classList.add("on");
+  const first = s.querySelector(".opt");
+  if (first) first.focus();
 }
 function hideSheet(){
   if (openSheet) openSheet.classList.remove("on");
   openSheet = null; el.scrim.classList.remove("on");
+  if (sheetTrigger){ sheetTrigger.focus(); sheetTrigger = null; }
 }
 
 document.addEventListener("click", async e => {
@@ -717,7 +731,7 @@ $("#del").addEventListener("click", async () => {
   if (!n) return;
   if (!confirm("Delete “" + titleOf(n.text) + "”? This can't be undone.")) return;
   notes = notes.filter(x => x.id !== current);
-  current = null;
+  setCurrent(null);
   await persist(); render();
   if (window.innerWidth <= 720) document.body.classList.add("browsing");
   toast("Note deleted");
@@ -769,6 +783,14 @@ window.addEventListener("keydown", e => {
   if (mod && e.key.toLowerCase() === "k"){ e.preventDefault(); document.body.classList.add("browsing"); el.q.focus(); el.q.select(); }
   if (mod && e.key.toLowerCase() === "j"){ e.preventDefault(); newNote(); el.ed.focus(); }
   if (mod && e.key.toLowerCase() === "s"){ e.preventDefault(); if (current) showSheet(el.s1); }
+  if (e.key === "Tab" && openSheet){
+    const focusable = [...openSheet.querySelectorAll("button, [href], input, select, textarea")]
+      .filter(x => !x.hidden && x.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  }
 });
 
 /* tab inserts a tab in the editor */
@@ -801,6 +823,11 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) persi
     }];
     await persist();
   }
+
+  try {
+    const last = localStorage.getItem("ledger:current");
+    if (last && notes.some(n => n.id === last)) current = last;
+  } catch(e){}
   render();
 
   // "New note" home-screen shortcut
