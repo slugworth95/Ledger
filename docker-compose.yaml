@@ -1,0 +1,8 @@
+services:
+  ledger:
+    image: nginx:alpine
+    volumes:
+      - /mnt/user/appdata/ledger:/usr/share/nginx/html:ro
+    ports:
+      - "8088:80"
+    restart: unless-stopped
