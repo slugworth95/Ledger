@@ -1,0 +1,6 @@
+services:
+  ledger:
+    image: ctwilk95/ledger:latest
+    ports:
+      - "8088:80"
+    restart: unless-stopped
