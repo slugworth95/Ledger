@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#22262B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
   --paper:#E9E9E3;
@@ -59,9 +60,14 @@ html[data-theme="dark"] .bar{border-bottom:1px solid var(--rule)}
 .bar .spacer{flex:1}
 .ibtn{
   width:38px;height:38px;border-radius:7px;display:grid;place-items:center;
-  color:#E9E9E3;opacity:.85;
+  color:#E9E9E3;opacity:.85;position:relative;
 }
 .ibtn:hover{background:rgba(255,255,255,.08);opacity:1}
+.ibtn.on{opacity:1}
+.ibtn.on::after{
+  content:"";position:absolute;top:6px;right:6px;width:6px;height:6px;
+  border-radius:50%;background:#4CAF50;box-shadow:0 0 0 2px var(--slate);
+}
 .ibtn svg{width:19px;height:19px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 
 /* ---------- layout ---------- */
@@ -240,6 +246,9 @@ textarea{
   <button class="ibtn" id="exp" aria-label="Export" title="Export">
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v12M7 11l5 5 5-5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
   </button>
+  <button class="ibtn" id="drive" aria-label="Connect Google Drive" title="Connect Google Drive">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 18a4 4 0 01-.6-7.96 5 5 0 019.44-2A4.5 4.5 0 0117.5 17H7z"/><path d="M12 12v5M9.5 14.5L12 12l2.5 2.5"/></svg>
+  </button>
   <button class="ibtn" id="theme" aria-label="Switch theme" title="Theme">
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 109 9 7 7 0 01-9-9z"/></svg>
   </button>
@@ -295,6 +304,7 @@ The first line becomes the title." spellcheck="true" hidden></textarea>
     <button class="opt" data-a="one-md"><span class="ext">.md</span><span class="txt"><strong>Markdown</strong><span>Plain text for Obsidian, git, or anything else.</span></span></button>
     <button class="opt" data-a="one-txt"><span class="ext">.txt</span><span class="txt"><strong>Plain text</strong><span>No formatting, nothing to interpret.</span></span></button>
     <button class="opt" data-a="one-share" id="shareOpt" hidden><span class="ext">send</span><span class="txt"><strong>Share the web page</strong><span>Hand the .html file straight to another app.</span></span></button>
+    <button class="opt" data-a="one-drive"><span class="ext">drive</span><span class="txt"><strong>Save a copy to Drive</strong><span>Uploads this note as its own file to your connected Google Drive.</span></span></button>
   </div>
 </div>
 
@@ -304,6 +314,7 @@ The first line becomes the title." spellcheck="true" hidden></textarea>
     <button class="opt" data-a="all-html"><span class="ext">.html</span><span class="txt"><strong>Whole notebook as one page</strong><span>Every note in a single file with its own search. Readable anywhere, and re-importable.</span></span></button>
     <button class="opt" data-a="all-json"><span class="ext">.json</span><span class="txt"><strong>Backup file</strong><span>Exact data, for restoring into Ledger.</span></span></button>
     <button class="opt" data-a="all-md"><span class="ext">.md</span><span class="txt"><strong>Markdown bundle</strong><span>All notes in one Markdown document.</span></span></button>
+    <button class="opt" data-a="all-drive"><span class="ext">drive</span><span class="txt"><strong>Save notebook to Drive</strong><span>Uploads the whole notebook as one file to your connected Google Drive.</span></span></button>
   </div>
 </div>
 
@@ -345,7 +356,7 @@ const el = {
   list:$("#list"), ed:$("#ed"), meta:$("#meta"), blank:$("#blank"),
   mDate:$("#mDate"), mSize:$("#mSize"), q:$("#q"), toast:$("#toast"),
   scrim:$("#scrim"), s1:$("#sheet1"), s2:$("#sheet2"), drop:$("#drop"), file:$("#file"),
-  toolbar:$("#toolbar"), preview:$("#preview"), previewPane:$("#previewPane")
+  toolbar:$("#toolbar"), preview:$("#preview"), previewPane:$("#previewPane"), drive:$("#drive")
 };
 let previewOn = false;
 
@@ -522,7 +533,142 @@ function toggleLineMarker(kind){
   });
 }
 
-async function persist(){ await Store.save(notes); }
+/* ============ google drive ============
+   Uses the drive.file scope, which only ever grants access to files
+   this app itself created — never the rest of the user's Drive. */
+const GOOGLE_CLIENT_ID = "678128922768-msabi6gv91lp4q5dpmk1819711c7khhh.apps.googleusercontent.com";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+let tokenClient = null;
+let driveToken = null;
+let driveFileId = null;
+let driveSyncTimer = null;
+try { driveFileId = localStorage.getItem("ledger:driveFileId") || null; } catch(e){}
+
+function updateDriveUI(connected){
+  el.drive.classList.toggle("on", connected);
+  const label = connected ? "Google Drive connected — click to disconnect" : "Connect Google Drive";
+  el.drive.setAttribute("aria-label", label);
+  el.drive.title = label;
+}
+
+function initGoogle(){
+  if (tokenClient) return true;
+  if (!window.google || !google.accounts || !google.accounts.oauth2) return false;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: () => {}
+  });
+  return true;
+}
+
+function trySilentDriveReconnect(attempts){
+  attempts = attempts || 0;
+  if (attempts > 15) return;
+  if (initGoogle()) ensureDrive();
+  else setTimeout(() => trySilentDriveReconnect(attempts + 1), 300);
+}
+
+function ensureDrive(interactive){
+  return new Promise(resolve => {
+    if (driveToken){ resolve(true); return; }
+    if (!initGoogle()){ if (interactive) toast("Google Sign-In isn't available here"); resolve(false); return; }
+    let settled = false;
+    const done = ok => { if (settled) return; settled = true; clearTimeout(timer); resolve(ok); };
+    const timer = setTimeout(() => {
+      if (interactive) toast("Couldn't reach Google — check your popup blocker");
+      done(false);
+    }, 25000);
+    tokenClient.callback = resp => {
+      if (resp.error){ done(false); return; }
+      driveToken = { access_token: resp.access_token, expires_at: Date.now() + resp.expires_in * 1000 };
+      try { localStorage.setItem("ledger:driveConnected", "1"); } catch(e){}
+      updateDriveUI(true);
+      done(true);
+    };
+    tokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
+  });
+}
+
+async function driveFetch(url, opts){
+  opts = opts || {};
+  const withAuth = () => Object.assign({}, opts, {
+    headers: Object.assign({}, opts.headers, { Authorization: "Bearer " + (driveToken ? driveToken.access_token : "") })
+  });
+  let res = await fetch(url, withAuth());
+  if (res.status === 401){
+    driveToken = null;
+    const ok = await ensureDrive(false);
+    res = ok ? await fetch(url, withAuth()) : res;
+  }
+  return res;
+}
+
+function multipartBody(meta, mime, text){
+  const boundary = "ledgerbound" + Date.now();
+  return {
+    boundary,
+    body: "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(meta) +
+      "\r\n--" + boundary + "\r\nContent-Type: " + mime + "\r\n\r\n" + text +
+      "\r\n--" + boundary + "--"
+  };
+}
+
+async function uploadToDrive(name, text, mime){
+  const ok = await ensureDrive(true);
+  if (!ok) return false;
+  try {
+    const {boundary, body} = multipartBody({name, mimeType: mime}, mime, text);
+    const res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+      method: "POST",
+      headers: {"Content-Type": "multipart/related; boundary=" + boundary},
+      body
+    });
+    if (!res.ok) throw new Error("upload failed");
+    toast("Saved " + name + " to Drive");
+    return true;
+  } catch(e){
+    toast("Couldn't save to Drive");
+    return false;
+  }
+}
+
+function queueDriveSync(){
+  if (!driveToken) return;
+  clearTimeout(driveSyncTimer);
+  driveSyncTimer = setTimeout(driveSyncNow, 2500);
+}
+
+async function driveSyncNow(){
+  if (!driveToken) return;
+  const body = JSON.stringify({kind:"ledger", version:1, exported:Date.now(), notes}, null, 2);
+  try {
+    let res;
+    if (driveFileId){
+      res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files/" + driveFileId + "?uploadType=media", {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body
+      });
+      if (!res.ok) throw new Error("update failed");
+    } else {
+      const {boundary, body: mpBody} = multipartBody({name: "ledger-backup.json", mimeType: "application/json"}, "application/json", body);
+      res = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: {"Content-Type": "multipart/related; boundary=" + boundary},
+        body: mpBody
+      });
+      if (!res.ok) throw new Error("create failed");
+      const data = await res.json();
+      driveFileId = data.id;
+      try { localStorage.setItem("ledger:driveFileId", driveFileId); } catch(e){}
+    }
+  } catch(e){
+    toast("Drive sync failed — will retry");
+  }
+}
+
+async function persist(){ await Store.save(notes); queueDriveSync(); }
 function queueSave(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(persist, 350);
@@ -536,7 +682,7 @@ function setCurrent(id){
   } catch(e){}
 }
 
-function open(id){
+function openNote(id){
   setCurrent(id);
   previewOn = false;
   document.body.classList.remove("browsing");
@@ -802,17 +948,19 @@ document.addEventListener("click", async e => {
     const ok = await shareFile(name, noteHTML(n), "text/html");
     if (!ok) download(name, noteHTML(n), "text/html");
   }
+  if (a === "one-drive") await uploadToDrive(slug(n.text) + ".html", noteHTML(n), "text/html");
   const stamp = new Date().toISOString().slice(0,10);
   if (a === "all-html")  download("notebook-" + stamp + ".html", bookHTML(notes), "text/html");
   if (a === "all-json")  download("ledger-backup-" + stamp + ".json",
       JSON.stringify({kind:"ledger", version:1, exported:Date.now(), notes}, null, 2), "application/json");
   if (a === "all-md")    download("notebook-" + stamp + ".md", bookMD(notes), "text/markdown");
+  if (a === "all-drive") await uploadToDrive("notebook-" + stamp + ".html", bookHTML(notes), "text/html");
 });
 
 /* ============ wiring ============ */
 el.list.addEventListener("click", e => {
   const r = e.target.closest(".row");
-  if (r) open(r.dataset.id);
+  if (r) openNote(r.dataset.id);
 });
 el.q.addEventListener("input", render);
 
@@ -900,6 +1048,21 @@ $("#theme").addEventListener("click", () => {
   try { localStorage.setItem("ledger:theme", next); } catch(e){}
 });
 
+el.drive.addEventListener("click", async () => {
+  if (driveToken){
+    if (window.google && google.accounts && google.accounts.oauth2){
+      google.accounts.oauth2.revoke(driveToken.access_token, () => {});
+    }
+    driveToken = null;
+    try { localStorage.removeItem("ledger:driveConnected"); } catch(e){}
+    updateDriveUI(false);
+    toast("Google Drive disconnected");
+    return;
+  }
+  const ok = await ensureDrive(true);
+  if (ok){ toast("Google Drive connected"); queueDriveSync(); }
+});
+
 /* drag and drop */
 let dragDepth = 0;
 ["dragenter","dragover"].forEach(t => window.addEventListener(t, e => {
@@ -976,6 +1139,10 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) persi
     if (last && notes.some(n => n.id === last)) current = last;
   } catch(e){}
   render();
+
+  try {
+    if (localStorage.getItem("ledger:driveConnected") === "1") trySilentDriveReconnect();
+  } catch(e){}
 
   // "New note" home-screen shortcut
   if (new URLSearchParams(location.search).get("new")){
