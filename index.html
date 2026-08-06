@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger — portable notes</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#22262B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{
+  --paper:#E9E9E3;
+  --wash:#DEDED6;
+  --rule:#C8C9C0;
+  --ink:#191A17;
+  --graphite:#6C6E68;
+  --slate:#22262B;
+  --stamp:#8C2F39;
+  --stamp-soft:rgba(140,47,57,.10);
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+}
+html[data-theme="dark"]{
+  --paper:#16181B;
+  --wash:#1E2126;
+  --rule:#2E333A;
+  --ink:#DEDFD9;
+  --graphite:#878B85;
+  --slate:#0F1113;
+  --stamp:#C4545F;
+  --stamp-soft:rgba(196,84,95,.14);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:var(--sans);
+  overscroll-behavior:none;
+  display:flex;flex-direction:column;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--stamp);outline-offset:2px}
+
+/* ---------- top bar ---------- */
+.bar{
+  background:var(--slate);color:#E9E9E3;
+  display:flex;align-items:center;gap:2px;
+  padding:calc(env(safe-area-inset-top) + 8px) 8px 8px;
+  flex:0 0 auto;
+}
+html[data-theme="dark"] .bar{border-bottom:1px solid var(--rule)}
+.brand{
+  font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  padding:0 10px 0 6px;opacity:.8;white-space:nowrap;
+}
+.brand b{color:var(--stamp);font-weight:700}
+.bar .spacer{flex:1}
+.ibtn{
+  width:38px;height:38px;border-radius:7px;display:grid;place-items:center;
+  color:#E9E9E3;opacity:.85;
+}
+.ibtn:hover{background:rgba(255,255,255,.08);opacity:1}
+.ibtn svg{width:19px;height:19px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- layout ---------- */
+.wrap{flex:1;display:flex;min-height:0;position:relative}
+
+/* index pane */
+.index{
+  width:290px;flex:0 0 auto;border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;background:var(--wash);min-height:0;
+}
+.search{
+  padding:10px;border-bottom:1px solid var(--rule);display:flex;gap:8px;align-items:center;
+}
+.search input{
+  width:100%;background:var(--paper);border:1px solid var(--rule);border-radius:6px;
+  padding:8px 10px;font-family:var(--mono);font-size:13px;color:var(--ink);
+}
+.search input::placeholder{color:var(--graphite)}
+.list{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.row{
+  display:block;width:100%;text-align:left;padding:11px 14px;
+  border-bottom:1px solid var(--rule);position:relative;
+}
+.row:hover{background:var(--paper)}
+.row.on{background:var(--paper)}
+.row.on:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--stamp)}
+.row .t{font-size:14px;font-weight:600;line-height:1.3;margin-bottom:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .m{font-family:var(--mono);font-size:10.5px;color:var(--graphite);letter-spacing:.03em;
+  display:flex;gap:8px}
+.row .m .dot{opacity:.45}
+.empty{padding:28px 18px;color:var(--graphite);font-size:13px;line-height:1.6}
+.empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:6px}
+
+.newbtn{
+  border-top:1px solid var(--rule);padding:12px;font-family:var(--mono);font-size:12px;
+  letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;
+  justify-content:center;gap:8px;background:var(--paper);
+}
+.newbtn:hover{background:var(--stamp-soft);color:var(--stamp)}
+
+/* editor pane */
+.editor{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.meta{
+  display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:11px;color:var(--graphite);letter-spacing:.05em;
+  flex:0 0 auto;
+}
+.meta .sep{opacity:.4}
+.meta .grow{flex:1}
+.meta .act{color:var(--stamp);text-transform:uppercase;letter-spacing:.1em;font-size:10.5px;
+  padding:5px 9px;border:1px solid var(--stamp);border-radius:5px}
+.meta .act:hover{background:var(--stamp);color:var(--paper)}
+.meta .plain{padding:5px 7px;border-radius:5px}
+.meta .plain:hover{background:var(--wash);color:var(--ink)}
+textarea{
+  flex:1;width:100%;border:none;resize:none;background:var(--paper);color:var(--ink);
+  font-family:var(--mono);font-size:15px;line-height:1.68;padding:20px 18px 40vh;
+  outline:none;min-height:0;
+}
+.noselect{display:grid;place-items:center;flex:1;padding:30px;text-align:center;color:var(--graphite)}
+.noselect p{font-family:var(--mono);font-size:12.5px;letter-spacing:.05em;line-height:1.9;max-width:280px}
+
+/* ---------- sheet ---------- */
+.scrim{position:fixed;inset:0;background:rgba(10,11,10,.5);opacity:0;pointer-events:none;
+  transition:opacity .18s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;z-index:50;background:var(--paper);border:1px solid var(--rule);
+  left:50%;top:50%;transform:translate(-50%,-48%);width:min(440px,calc(100% - 28px));
+  border-radius:10px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+  max-height:86vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);
+}
+.sheet.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+.sheet h2{
+  margin:0;padding:15px 18px;border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;
+  font-weight:600;display:flex;align-items:center;gap:9px;
+}
+.sheet h2 .sq{width:9px;height:9px;background:var(--stamp)}
+.sheet .body{padding:6px 0}
+.opt{
+  display:flex;width:100%;text-align:left;gap:13px;padding:13px 18px;align-items:flex-start;
+  border-bottom:1px solid var(--rule);
+}
+.opt:last-child{border-bottom:none}
+.opt:hover{background:var(--wash)}
+.opt .ext{
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;font-weight:700;
+  background:var(--stamp-soft);color:var(--stamp);padding:4px 6px;border-radius:4px;
+  flex:0 0 auto;margin-top:1px;min-width:46px;text-align:center;
+}
+.opt .txt strong{display:block;font-size:14px;font-weight:600;margin-bottom:3px}
+.opt .txt span{font-size:12.5px;color:var(--graphite);line-height:1.45;display:block}
+.opt.danger .ext{background:transparent;border:1px solid var(--rule);color:var(--graphite)}
+.sheet .foot{padding:12px 18px;border-top:1px solid var(--rule);display:flex;gap:10px}
+.sheet .foot button{
+  flex:1;padding:10px;border:1px solid var(--rule);border-radius:6px;font-family:var(--mono);
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+}
+.sheet .foot button:hover{background:var(--wash)}
+.sheet .foot .go{background:var(--stamp);color:#fff;border-color:var(--stamp)}
+.sheet .foot .go:hover{opacity:.88;background:var(--stamp)}
+
+/* toast */
+.toast{
+  position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 22px);
+  transform:translate(-50%,14px);background:var(--slate);color:#E9E9E3;
+  font-family:var(--mono);font-size:12px;letter-spacing:.04em;padding:11px 16px;border-radius:7px;
+  opacity:0;pointer-events:none;transition:all .2s;z-index:60;max-width:88vw;text-align:center;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* drag */
+.drop{
+  position:fixed;inset:0;z-index:70;background:rgba(140,47,57,.14);
+  border:3px dashed var(--stamp);display:none;place-items:center;
+  font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;font-size:13px;color:var(--stamp)
+}
+.drop.on{display:grid}
+
+/* mobile */
+.backbtn{display:none}
+@media (max-width:720px){
+  .index{
+    position:absolute;inset:0;width:100%;z-index:20;border-right:none;
+    transform:translateX(-100%);transition:transform .22s ease;
+  }
+  body.browsing .index{transform:translateX(0)}
+  .backbtn{display:grid}
+  .row{padding:14px}
+  textarea{font-size:16px;padding:16px 15px 45vh}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body class="browsing">
+
+<div class="bar">
+  <button class="ibtn backbtn" id="back" aria-label="All notes">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <div class="brand">Ledger<b>.</b></div>
+  <div class="spacer"></div>
+  <button class="ibtn" id="imp" aria-label="Import file" title="Import">
+    <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
+  </button>
+  <button class="ibtn" id="exp" aria-label="Export" title="Export">
+    <svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
+  </button>
+  <button class="ibtn" id="theme" aria-label="Switch theme" title="Theme">
+    <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 109 9 7 7 0 01-9-9z"/></svg>
+  </button>
+</div>
+
+<div class="wrap">
+  <nav class="index" id="index">
+    <div class="search">
+      <input id="q" type="search" placeholder="Search notes" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="list" id="list"></div>
+    <button class="newbtn" id="new">＋ New note</button>
+  </nav>
+
+  <main class="editor">
+    <div class="meta" id="meta" hidden>
+      <span id="mDate">—</span>
+      <span class="sep">/</span>
+      <span id="mSize">0 B</span>
+      <span class="grow"></span>
+      <button class="plain" id="dup" title="Duplicate">Copy</button>
+      <button class="plain" id="del" title="Delete">Delete</button>
+      <button class="act" id="ship">Export</button>
+    </div>
+    <textarea id="ed" placeholder="Start typing.
+
+The first line becomes the title." spellcheck="true" hidden></textarea>
+    <div class="noselect" id="blank">
+      <p>No note open.<br>Pick one from the index, or start a new one.</p>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="sheet" id="sheet1">
+  <h2><span class="sq"></span> Export this note</h2>
+  <div class="body">
+    <button class="opt" data-a="one-html"><span class="ext">.html</span><span class="txt"><strong>Readable web page</strong><span>Opens in any browser, works offline, and Ledger can re-import it later. The recommended way to move a note around.</span></span></button>
+    <button class="opt" data-a="one-md"><span class="ext">.md</span><span class="txt"><strong>Markdown</strong><span>Plain text for Obsidian, git, or anything else.</span></span></button>
+    <button class="opt" data-a="one-txt"><span class="ext">.txt</span><span class="txt"><strong>Plain text</strong><span>No formatting, nothing to interpret.</span></span></button>
+    <button class="opt" data-a="one-share" id="shareOpt" hidden><span class="ext">send</span><span class="txt"><strong>Share the web page</strong><span>Hand the .html file straight to another app.</span></span></button>
+  </div>
+</div>
+
+<div class="sheet" id="sheet2">
+  <h2><span class="sq"></span> Export everything</h2>
+  <div class="body">
+    <button class="opt" data-a="all-html"><span class="ext">.html</span><span class="txt"><strong>Whole notebook as one page</strong><span>Every note in a single file with its own search. Readable anywhere, and re-importable.</span></span></button>
+    <button class="opt" data-a="all-json"><span class="ext">.json</span><span class="txt"><strong>Backup file</strong><span>Exact data, for restoring into Ledger.</span></span></button>
+    <button class="opt" data-a="all-md"><span class="ext">.md</span><span class="txt"><strong>Markdown bundle</strong><span>All notes in one Markdown document.</span></span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="drop" id="drop">Drop to import</div>
+<input type="file" id="file" accept=".html,.htm,.json,.md,.txt,.markdown,text/*" multiple hidden>
+
+<script>
+/* ============ storage adapter ============
+   Uses the artifact storage API when present, falls back to
+   localStorage when this file is hosted on your own server. */
+const KEY = "ledger:notes:v1";
+const Store = (() => {
+  const ws = (typeof window !== "undefined" && window.storage && typeof window.storage.get === "function") ? window.storage : null;
+  return {
+    kind: ws ? "artifact" : "local",
+    async load(){
+      if (ws){
+        try { const r = await ws.get(KEY); return r && r.value ? JSON.parse(r.value) : []; }
+        catch(e){ return []; }
+      }
+      try { const v = localStorage.getItem(KEY); return v ? JSON.parse(v) : []; }
+      catch(e){ return []; }
+    },
+    async save(notes){
+      const v = JSON.stringify(notes);
+      if (ws){ try { await ws.set(KEY, v); return true; } catch(e){ return false; } }
+      try { localStorage.setItem(KEY, v); return true; } catch(e){ return false; }
+    }
+  };
+})();
+
+/* ============ state ============ */
+let notes = [];
+let current = null;
+let saveTimer = null;
+const $ = s => document.querySelector(s);
+const el = {
+  list:$("#list"), ed:$("#ed"), meta:$("#meta"), blank:$("#blank"),
+  mDate:$("#mDate"), mSize:$("#mSize"), q:$("#q"), toast:$("#toast"),
+  scrim:$("#scrim"), s1:$("#sheet1"), s2:$("#sheet2"), drop:$("#drop"), file:$("#file")
+};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const titleOf = t => {
+  const l = (t||"").split("\n").find(x => x.trim());
+  if (!l) return "Untitled";
+  return l.replace(/^#{1,6}\s*/,"").trim().slice(0,90) || "Untitled";
+};
+const bytes = n => {
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n/1024).toFixed(1) + " KB";
+  return (n/1048576).toFixed(2) + " MB";
+};
+const size = t => new Blob([t||""]).size;
+const when = ts => {
+  const d = new Date(ts), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  const y = new Date(now); y.setDate(y.getDate()-1);
+  if (d.toDateString() === y.toDateString()) return "Yesterday";
+  const opts = d.getFullYear() === now.getFullYear() ? {month:"short",day:"numeric"} : {year:"numeric",month:"short",day:"numeric"};
+  return d.toLocaleDateString([], opts);
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const slug = s => (titleOf(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "note").slice(0,48);
+
+function toast(msg){
+  el.toast.textContent = msg;
+  el.toast.classList.add("on");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.toast.classList.remove("on"), 2300);
+}
+
+/* ============ tiny markdown ============ */
+function md(src){
+  const lines = String(src||"").replace(/\r\n/g,"\n").split("\n");
+  let out = [], i = 0, para = [], list = null;
+  const inline = s => esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" rel="noreferrer">$1</a>')
+    .replace(/(^|[\s(])((?:https?:\/\/)[^\s<)]+)/g, '$1<a href="$2" rel="noreferrer">$2</a>');
+  const flushP = () => { if (para.length){ out.push("<p>" + inline(para.join(" ")) + "</p>"); para = []; } };
+  const flushL = () => { if (list){ out.push("</" + list + ">"); list = null; } };
+  const openL = t => { if (list !== t){ flushL(); out.push("<" + t + ">"); list = t; } };
+
+  while (i < lines.length){
+    const ln = lines[i];
+    if (/^```/.test(ln)){
+      flushP(); flushL();
+      const lang = ln.slice(3).trim(); const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      out.push('<pre data-lang="' + esc(lang) + '"><code>' + esc(buf.join("\n")) + "</code></pre>");
+      continue;
+    }
+    if (!ln.trim()){ flushP(); flushL(); i++; continue; }
+    let m;
+    if (m = ln.match(/^(#{1,6})\s+(.*)$/)){
+      flushP(); flushL();
+      const lv = m[1].length;
+      out.push("<h" + lv + ">" + inline(m[2]) + "</h" + lv + ">");
+    } else if (/^(-{3,}|\*{3,}|_{3,})$/.test(ln.trim())){
+      flushP(); flushL(); out.push("<hr>");
+    } else if (m = ln.match(/^\s*[-*+]\s+\[([ xX])\]\s+(.*)$/)){
+      flushP(); openL("ul");
+      out.push('<li class="task"><input type="checkbox" disabled' + (m[1]===" "?"":" checked") + "> " + inline(m[2]) + "</li>");
+    } else if (m = ln.match(/^\s*[-*+]\s+(.*)$/)){
+      flushP(); openL("ul"); out.push("<li>" + inline(m[1]) + "</li>");
+    } else if (m = ln.match(/^\s*\d+[.)]\s+(.*)$/)){
+      flushP(); openL("ol"); out.push("<li>" + inline(m[1]) + "</li>");
+    } else if (m = ln.match(/^>\s?(.*)$/)){
+      flushP(); flushL(); out.push("<blockquote>" + inline(m[1]) + "</blockquote>");
+    } else {
+      flushL(); para.push(ln.trim());
+    }
+    i++;
+  }
+  flushP(); flushL();
+  return out.join("\n");
+}
+
+/* ============ render ============ */
+function render(){
+  const term = el.q.value.trim().toLowerCase();
+  const shown = notes
+    .filter(n => !term || (n.text||"").toLowerCase().includes(term))
+    .sort((a,b) => b.updated - a.updated);
+
+  if (!shown.length){
+    el.list.innerHTML = term
+      ? '<div class="empty"><b>Nothing matched.</b>Try a different word, or clear the search.</div>'
+      : '<div class="empty"><b>No notes yet.</b>Start one below, or import a file you exported earlier — Ledger reads back its own .html and .json.</div>';
+  } else {
+    el.list.innerHTML = shown.map(n => {
+      const body = (n.text||"").split("\n").slice(1).join(" ").trim();
+      return '<button class="row' + (current === n.id ? " on" : "") + '" data-id="' + n.id + '">' +
+        '<div class="t">' + esc(titleOf(n.text)) + "</div>" +
+        '<div class="m"><span>' + when(n.updated) + '</span><span class="dot">·</span><span>' +
+        bytes(size(n.text)) + "</span></div></button>";
+    }).join("");
+  }
+
+  const n = notes.find(x => x.id === current);
+  if (n){
+    el.meta.hidden = false; el.ed.hidden = false; el.blank.hidden = true;
+    if (el.ed.value !== n.text) el.ed.value = n.text;
+    el.mDate.textContent = when(n.updated);
+    el.mSize.textContent = bytes(size(n.text));
+  } else {
+    el.meta.hidden = true; el.ed.hidden = true; el.blank.hidden = false;
+  }
+}
+
+async function persist(){ await Store.save(notes); }
+function queueSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persist, 350);
+}
+
+function open(id){
+  current = id;
+  document.body.classList.remove("browsing");
+  render();
+  if (window.innerWidth > 720) el.ed.focus();
+}
+
+function newNote(text){
+  const n = {id:uid(), text:text||"", created:Date.now(), updated:Date.now()};
+  notes.push(n); current = n.id;
+  document.body.classList.remove("browsing");
+  persist(); render();
+  return n;
+}
+
+/* ============ export builders ============ */
+const CSS_DOC = `
+:root{color-scheme:light dark}
+*{box-sizing:border-box}
+body{margin:0;background:#E9E9E3;color:#191A17;
+  font:17px/1.72 Iowan Old Style,Palatino,Georgia,"Times New Roman",serif;
+  padding:0 20px 90px;-webkit-text-size-adjust:100%}
+.sheet{max-width:41rem;margin:0 auto}
+header{border-bottom:2px solid #191A17;padding:38px 0 14px;margin-bottom:30px}
+.eyebrow{font:600 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.2em;text-transform:uppercase;color:#8C2F39;margin-bottom:14px}
+h1.doc{font-size:31px;line-height:1.2;margin:0 0 12px;font-weight:600;letter-spacing:-.01em}
+.stamp{font:10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
+  color:#6C6E68;display:flex;flex-wrap:wrap;gap:10px}
+.stamp i{font-style:normal;opacity:.45}
+article h1,article h2,article h3,article h4{line-height:1.25;margin:1.9em 0 .55em;font-weight:600}
+article h1{font-size:25px} article h2{font-size:21px} article h3{font-size:18px}
+article h4{font-size:16px}
+p{margin:0 0 1.15em}
+a{color:#8C2F39;text-underline-offset:2px}
+code{font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:rgba(140,47,57,.09);padding:.12em .38em;border-radius:3px}
+pre{background:#22262B;color:#E4E5DF;padding:15px 16px;border-radius:7px;overflow-x:auto;margin:0 0 1.3em}
+pre code{background:none;padding:0;color:inherit;font-size:13px;line-height:1.6}
+blockquote{margin:0 0 1.2em;padding:2px 0 2px 17px;border-left:3px solid #C8C9C0;color:#4A4C47}
+hr{border:none;border-top:1px solid #C8C9C0;margin:2.2em 0}
+ul,ol{padding-left:1.35em;margin:0 0 1.15em}
+li{margin-bottom:.35em}
+li.task{list-style:none;margin-left:-1.25em}
+li.task input{margin-right:.45em}
+del{color:#6C6E68}
+footer{margin-top:52px;padding-top:16px;border-top:1px solid #C8C9C0;
+  font:11px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6C6E68;letter-spacing:.04em}
+.toc{list-style:none;padding:0;margin:0 0 44px}
+.toc li{border-bottom:1px solid #C8C9C0;margin:0}
+.toc a{display:flex;justify-content:space-between;gap:14px;padding:11px 2px;
+  text-decoration:none;color:#191A17;align-items:baseline}
+.toc a:hover{color:#8C2F39}
+.toc .n{font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6C6E68;
+  letter-spacing:.05em;white-space:nowrap}
+.entry{padding-top:14px;margin-bottom:52px;border-top:1px solid #C8C9C0}
+.entry h1.doc{font-size:24px;margin-bottom:8px}
+.finder{width:100%;font:14px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:11px 13px;
+  border:1px solid #C8C9C0;border-radius:6px;background:#fff;color:#191A17;margin-bottom:26px}
+.up{position:fixed;right:16px;bottom:16px;background:#22262B;color:#E9E9E3;text-decoration:none;
+  font:10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;
+  padding:11px 13px;border-radius:6px;text-transform:uppercase}
+@media (prefers-color-scheme:dark){
+  body{background:#16181B;color:#DEDFD9}
+  header{border-color:#DEDFD9} h1.doc{color:#DEDFD9}
+  .eyebrow,a,.toc a:hover{color:#C4545F}
+  code{background:rgba(196,84,95,.16)}
+  blockquote{border-color:#2E333A;color:#A9ADA6}
+  hr,footer,.entry,.toc li{border-color:#2E333A}
+  .toc a{color:#DEDFD9}
+  .finder{background:#1E2126;border-color:#2E333A;color:#DEDFD9}
+}
+@media print{.up,.finder{display:none}body{background:#fff;padding:0}}
+`;
+
+// JSON embedded in exported HTML so the file can be read back in.
+const payload = data =>
+  '<script type="application/json" id="ledger-data">' +
+  JSON.stringify(data).replace(/<\//g, "<\\/") +
+  "<\/script>";
+
+function noteHTML(n){
+  const t = titleOf(n.text);
+  const d = new Date(n.updated);
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(t)}</title>
+<style>${CSS_DOC}</style></head>
+<body><div class="sheet">
+<header>
+  <div class="eyebrow">Ledger note</div>
+  <h1 class="doc">${esc(t)}</h1>
+  <div class="stamp"><span>${esc(d.toLocaleString())}</span><i>/</i><span>${bytes(size(n.text))}</span></div>
+</header>
+<article>${md(n.text)}</article>
+<footer>Self-contained file — no network, no scripts required to read it.<br>
+Drop it back into Ledger to restore the note.</footer>
+</div>
+${payload({kind:"ledger", version:1, notes:[n]})}
+</body></html>`;
+}
+
+function bookHTML(list){
+  const sorted = [...list].sort((a,b) => b.updated - a.updated);
+  const toc = sorted.map((n,i) =>
+    `<li><a href="#n${i}"><span>${esc(titleOf(n.text))}</span><span class="n">${when(n.updated)} · ${bytes(size(n.text))}</span></a></li>`
+  ).join("");
+  const body = sorted.map((n,i) => `<section class="entry" id="n${i}">
+  <h1 class="doc">${esc(titleOf(n.text))}</h1>
+  <div class="stamp"><span>${esc(new Date(n.updated).toLocaleString())}</span><i>/</i><span>${bytes(size(n.text))}</span></div>
+  <article>${md(n.text)}</article></section>`).join("\n");
+  const total = sorted.reduce((s,n) => s + size(n.text), 0);
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notebook — ${sorted.length} notes</title>
+<style>${CSS_DOC}</style></head>
+<body><div class="sheet">
+<header>
+  <div class="eyebrow">Ledger notebook</div>
+  <h1 class="doc">${sorted.length} note${sorted.length===1?"":"s"}</h1>
+  <div class="stamp"><span>${esc(new Date().toLocaleString())}</span><i>/</i><span>${bytes(total)}</span></div>
+</header>
+<input class="finder" id="f" placeholder="Filter notes" autocomplete="off">
+<ul class="toc" id="toc">${toc}</ul>
+${body}
+<footer>Every note is in this one file. Works offline in any browser.<br>
+Drop it back into Ledger to restore all ${sorted.length}.</footer>
+</div>
+<a class="up" href="#">Top</a>
+${payload({kind:"ledger", version:1, notes:sorted})}
+<script>
+(function(){
+  var f=document.getElementById("f"), items=[].slice.call(document.querySelectorAll("#toc li"));
+  var secs=[].slice.call(document.querySelectorAll(".entry"));
+  f.addEventListener("input",function(){
+    var q=f.value.toLowerCase();
+    items.forEach(function(li,i){
+      var hit=!q||(secs[i].textContent||"").toLowerCase().indexOf(q)>-1;
+      li.style.display=hit?"":"none"; secs[i].style.display=hit?"":"none";
+    });
+  });
+})();
+<\/script>
+</body></html>`;
+}
+
+const noteMD = n => n.text || "";
+const bookMD = list => [...list].sort((a,b)=>b.updated-a.updated)
+  .map(n => `<!-- ${new Date(n.updated).toISOString()} -->\n\n${n.text}`).join("\n\n---\n\n");
+
+/* ============ file out ============ */
+function download(name, text, mime){
+  const blob = new Blob([text], {type: mime + ";charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.rel = "noopener";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast("Saved " + name);
+}
+
+async function shareFile(name, text, mime){
+  try{
+    const file = new File([text], name, {type: mime});
+    if (navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:name});
+      return true;
+    }
+  }catch(e){ if (e && e.name === "AbortError") return true; }
+  return false;
+}
+
+/* ============ file in ============ */
+function readPayload(html){
+  const m = html.match(/<script type="application\/json" id="ledger-data">([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  try{
+    const data = JSON.parse(m[1].replace(/<\\\//g, "</"));
+    return (data && Array.isArray(data.notes)) ? data.notes : null;
+  }catch(e){ return null; }
+}
+
+function stripHTML(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script,style,noscript").forEach(x => x.remove());
+  return (doc.body ? doc.body.innerText || doc.body.textContent : "").replace(/\n{3,}/g,"\n\n").trim();
+}
+
+async function importFiles(files){
+  let added = 0, skipped = 0;
+  for (const f of files){
+    let raw;
+    try { raw = await f.text(); } catch(e){ skipped++; continue; }
+    const name = f.name.toLowerCase();
+    let incoming = null;
+
+    if (name.endsWith(".json")){
+      try{
+        const d = JSON.parse(raw);
+        incoming = Array.isArray(d) ? d : (Array.isArray(d.notes) ? d.notes : null);
+      }catch(e){ incoming = null; }
+    } else if (name.endsWith(".html") || name.endsWith(".htm") || /^\s*<!doctype html/i.test(raw)){
+      incoming = readPayload(raw);
+      if (!incoming){
+        const t = stripHTML(raw);
+        incoming = t ? [{text:t}] : null;
+      }
+    } else {
+      incoming = raw.trim() ? [{text: raw}] : null;
+    }
+
+    if (!incoming || !incoming.length){ skipped++; continue; }
+
+    for (const n of incoming){
+      const text = typeof n === "string" ? n : (n.text || n.body || n.content || "");
+      if (!text.trim()) continue;
+      if (notes.some(x => x.text === text)) continue;   // don't duplicate
+      notes.push({
+        id: uid(),
+        text,
+        created: n.created || Date.now(),
+        updated: n.updated || Date.now()
+      });
+      added++;
+    }
+  }
+  await persist(); render();
+  if (added) toast("Imported " + added + " note" + (added===1?"":"s"));
+  else toast(skipped ? "Nothing readable in that file" : "Nothing new to import");
+}
+
+/* ============ sheets ============ */
+let openSheet = null;
+function showSheet(s){
+  openSheet = s; s.classList.add("on"); el.scrim.classList.add("on");
+}
+function hideSheet(){
+  if (openSheet) openSheet.classList.remove("on");
+  openSheet = null; el.scrim.classList.remove("on");
+}
+
+document.addEventListener("click", async e => {
+  const opt = e.target.closest(".opt");
+  if (!opt) return;
+  const a = opt.dataset.a;
+  const n = notes.find(x => x.id === current);
+  hideSheet();
+  if (a.startsWith("one-") && !n) return;
+
+  if (a === "one-html")  download(slug(n.text) + ".html", noteHTML(n), "text/html");
+  if (a === "one-md")    download(slug(n.text) + ".md", noteMD(n), "text/markdown");
+  if (a === "one-txt")   download(slug(n.text) + ".txt", n.text || "", "text/plain");
+  if (a === "one-share"){
+    const name = slug(n.text) + ".html";
+    const ok = await shareFile(name, noteHTML(n), "text/html");
+    if (!ok) download(name, noteHTML(n), "text/html");
+  }
+  const stamp = new Date().toISOString().slice(0,10);
+  if (a === "all-html")  download("notebook-" + stamp + ".html", bookHTML(notes), "text/html");
+  if (a === "all-json")  download("ledger-backup-" + stamp + ".json",
+      JSON.stringify({kind:"ledger", version:1, exported:Date.now(), notes}, null, 2), "application/json");
+  if (a === "all-md")    download("notebook-" + stamp + ".md", bookMD(notes), "text/markdown");
+});
+
+/* ============ wiring ============ */
+el.list.addEventListener("click", e => {
+  const r = e.target.closest(".row");
+  if (r) open(r.dataset.id);
+});
+el.q.addEventListener("input", render);
+
+$("#new").addEventListener("click", () => { newNote(); el.ed.focus(); });
+$("#back").addEventListener("click", () => document.body.classList.add("browsing"));
+
+el.ed.addEventListener("input", () => {
+  const n = notes.find(x => x.id === current);
+  if (!n) return;
+  n.text = el.ed.value; n.updated = Date.now();
+  el.mSize.textContent = bytes(size(n.text));
+  el.mDate.textContent = when(n.updated);
+  const row = el.list.querySelector('.row[data-id="' + n.id + '"] .t');
+  if (row) row.textContent = titleOf(n.text);
+  queueSave();
+});
+
+$("#del").addEventListener("click", async () => {
+  const n = notes.find(x => x.id === current);
+  if (!n) return;
+  if (!confirm("Delete “" + titleOf(n.text) + "”? This can't be undone.")) return;
+  notes = notes.filter(x => x.id !== current);
+  current = null;
+  await persist(); render();
+  if (window.innerWidth <= 720) document.body.classList.add("browsing");
+  toast("Note deleted");
+});
+
+$("#dup").addEventListener("click", () => {
+  const n = notes.find(x => x.id === current);
+  if (!n) return;
+  newNote(n.text); render(); toast("Copy made");
+});
+
+$("#ship").addEventListener("click", () => showSheet(el.s1));
+$("#exp").addEventListener("click", () => {
+  if (!notes.length) return toast("No notes to export yet");
+  showSheet(el.s2);
+});
+$("#imp").addEventListener("click", () => el.file.click());
+el.file.addEventListener("change", e => {
+  if (e.target.files.length) importFiles([...e.target.files]);
+  e.target.value = "";
+});
+el.scrim.addEventListener("click", hideSheet);
+
+$("#theme").addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("ledger:theme", next); } catch(e){}
+});
+
+/* drag and drop */
+let dragDepth = 0;
+["dragenter","dragover"].forEach(t => window.addEventListener(t, e => {
+  if (!e.dataTransfer || ![...e.dataTransfer.types].includes("Files")) return;
+  e.preventDefault();
+  if (t === "dragenter") dragDepth++;
+  el.drop.classList.add("on");
+}));
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0){ dragDepth = 0; el.drop.classList.remove("on"); } });
+window.addEventListener("drop", e => {
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  e.preventDefault(); dragDepth = 0; el.drop.classList.remove("on");
+  importFiles([...e.dataTransfer.files]);
+});
+
+/* keys */
+window.addEventListener("keydown", e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (e.key === "Escape"){ if (openSheet) hideSheet(); else el.q.blur(); }
+  if (mod && e.key.toLowerCase() === "k"){ e.preventDefault(); document.body.classList.add("browsing"); el.q.focus(); el.q.select(); }
+  if (mod && e.key.toLowerCase() === "j"){ e.preventDefault(); newNote(); el.ed.focus(); }
+  if (mod && e.key.toLowerCase() === "s"){ e.preventDefault(); if (current) showSheet(el.s1); }
+});
+
+/* tab inserts a tab in the editor */
+el.ed.addEventListener("keydown", e => {
+  if (e.key !== "Tab" || e.shiftKey) return;
+  e.preventDefault();
+  const s = el.ed.selectionStart, t = el.ed.selectionEnd;
+  el.ed.value = el.ed.value.slice(0,s) + "  " + el.ed.value.slice(t);
+  el.ed.selectionStart = el.ed.selectionEnd = s + 2;
+  el.ed.dispatchEvent(new Event("input"));
+});
+
+window.addEventListener("beforeunload", () => { clearTimeout(saveTimer); persist(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
+
+/* ============ boot ============ */
+(async function(){
+  try { const t = localStorage.getItem("ledger:theme"); if (t) document.documentElement.dataset.theme = t; } catch(e){}
+  if (navigator.canShare) $("#shareOpt").hidden = false;
+
+  notes = await Store.load();
+  if (!Array.isArray(notes)) notes = [];
+
+  if (!notes.length){
+    notes = [{
+      id: uid(),
+      created: Date.now(), updated: Date.now(),
+      text: "# Read me first\n\nThis is Ledger. Notes live on this device — no account, no server.\n\n## Getting a note onto another device\n\nHit **Export** on any note and pick the web page option. You get one `.html` file that:\n\n- opens in any browser, on any device, with no app installed\n- keeps its formatting and works with no network\n- can be dropped back into Ledger to restore the note exactly\n\nSo the file you send someone is the same file you'd use as a backup.\n\n## Bringing things in\n\nDrag a file onto this window, or use the import button up top. Ledger reads:\n\n- `.html` it exported before\n- `.json` backups\n- any `.md` or `.txt` file\n\n## Writing\n\nMarkdown works: `#` headings, `**bold**`, `*italic*`, lists, `> quotes`, and fenced code blocks.\n\n- [x] Formatting shows up in exports\n- [ ] Delete this note whenever you like\n\n## Shortcuts\n\n```\nCtrl/Cmd + J    new note\nCtrl/Cmd + K    search\nCtrl/Cmd + S    export current note\n```\n"
+    }];
+    await persist();
+  }
+  render();
+
+  // "New note" home-screen shortcut
+  if (new URLSearchParams(location.search).get("new")){
+    newNote(); render();
+    history.replaceState(null, "", location.pathname);
+  }
+
+  // Files opened with Ledger from the OS
+  if ("launchQueue" in window && "files" in LaunchParams.prototype){
+    window.launchQueue.setConsumer(async p => {
+      if (!p.files || !p.files.length) return;
+      const files = [];
+      for (const h of p.files){ try { files.push(await h.getFile()); } catch(e){} }
+      if (files.length) importFiles(files);
+    });
+  }
+
+  if (location.protocol === "https:" || location.hostname === "localhost"){
+    if ("serviceWorker" in navigator){
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  }
+})();
+</script>
+</body>
+</html>
