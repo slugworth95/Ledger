@@ -787,7 +787,8 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) persi
 /* ============ boot ============ */
 (async function(){
   try { const t = localStorage.getItem("ledger:theme"); if (t) document.documentElement.dataset.theme = t; } catch(e){}
-  if (navigator.canShare) $("#shareOpt").hidden = false;
+  if (navigator.canShare && navigator.canShare({files:[new File([""], "t.html", {type:"text/html"})]}))
+    $("#shareOpt").hidden = false;
 
   notes = await Store.load();
   if (!Array.isArray(notes)) notes = [];
