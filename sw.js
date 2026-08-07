@@ -1,12 +1,15 @@
 /* Ledger service worker — cache first, so the app opens with no network. */
-const CACHE = "ledger-v1";
+const CACHE = "ledger-v2";
 const SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
-  "./icon-maskable.png"
+"./icon-maskable.png",
+  "./apple-touch-icon.png",
+  "./favicon.ico",
+  "./favicon-32.png"
 ];
 
 self.addEventListener("install", e => {

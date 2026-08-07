@@ -1,0 +1,8 @@
+# Keep line endings stable across Windows editors and Linux containers.
+# Without this, saving index.html on Windows rewrites all 1200+ lines as CRLF
+# and git reports the whole file as changed.
+* text=auto eol=lf
+
+# Binary — never touch these.
+*.png binary
+*.ico binary
