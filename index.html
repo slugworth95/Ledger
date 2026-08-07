@@ -627,6 +627,18 @@ function multipartBody(meta, mime, text){
 async function ensureDriveFolder(){
   if (driveFolderId) return driveFolderId;
   try {
+    const q = encodeURIComponent("name = 'Ledger' and mimeType = 'application/vnd.google-apps.folder' and trashed = false");
+    const found = await driveFetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=" + encodeURIComponent("files(id)") + "&orderBy=createdTime");
+    if (found.ok){
+      const data = await found.json();
+      if (data.files && data.files.length){
+        driveFolderId = data.files[0].id;
+        try { localStorage.setItem("ledger:driveFolderId", driveFolderId); } catch(e){}
+        return driveFolderId;
+      }
+    }
+  } catch(e){}
+  try {
     const res = await driveFetch("https://www.googleapis.com/drive/v3/files", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
