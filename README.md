@@ -3,10 +3,12 @@
 A notes app that installs to your home screen and gets notes out as one
 self-contained `.html` file any browser can open.
 
+![Ledger notes app](screenshots/ledger.png)
+
 ## What's in here
 
 ```
-index.html                the whole app — no build step, no dependencies
+index.html                the whole app, no build step, no dependencies
 manifest.webmanifest      makes it installable
 sw.js                     offline cache
 icon-192.png              home screen icons
@@ -73,7 +75,7 @@ In this browser's `localStorage`, under the key `ledger:notes:v1`. That means:
   on a schedule if these notes matter.
 
 If you serve the same URL to a phone and a laptop, each keeps its own set.
-Moving notes between them is what the export files are for — the exported
+Moving notes between them is what the export files are for: the exported
 `.html` is both the readable copy and the restore file.
 
 ## The exported HTML
@@ -86,7 +88,7 @@ Every `.html` export carries the original note text inside it as JSON:
 
 A browser ignores it and shows the formatted page. Ledger reads it and restores
 the note exactly, timestamps and all. So one file covers reading, sharing, and
-backup — nothing to convert.
+backup, nothing to convert.
 
 ## Syncing, if you want it
 
@@ -94,7 +96,7 @@ The app has no sync and no server. The workable options:
 
 - Export the `.json` backup into a Syncthing or Nextcloud folder, and import it
   on the other device.
-- Serve the app from a Tailscale-only host so all your devices reach one URL —
+- Serve the app from a Tailscale-only host so all your devices reach one URL,
   though each browser still keeps its own notes.
 
 Adding real sync would mean a backend. If you want that, a small
@@ -104,6 +106,6 @@ adapter at the top of the script without touching the rest.
 ## Changing things
 
 Colors are CSS custom properties in `:root` near the top of `index.html`. The
-storage layer is the `Store` object — swap `load` and `save` for API calls and
+storage layer is the `Store` object, swap `load` and `save` for API calls and
 everything else keeps working. Bump `CACHE` in `sw.js` when you change files, or
 the old version keeps serving.

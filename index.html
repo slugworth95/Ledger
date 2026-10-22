@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ledger — portable notes</title>
+<title>Ledger: portable notes</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
@@ -270,7 +270,7 @@ textarea{
 
   <main class="editor">
     <div class="meta" id="meta" hidden>
-      <span id="mDate">—</span>
+      <span id="mDate">-</span>
       <span class="sep">/</span>
       <span id="mSize">0 B</span>
       <span class="grow"></span>
@@ -466,7 +466,7 @@ function render(){
   if (!shown.length){
     el.list.innerHTML = term
       ? '<div class="empty"><b>Nothing matched.</b>Try a different word, or clear the search.</div>'
-      : '<div class="empty"><b>No notes yet.</b>Start one below, or import a file you exported earlier — Ledger reads back its own .html and .json.</div>';
+      : '<div class="empty"><b>No notes yet.</b>Start one below, or import a file you exported earlier, Ledger reads back its own .html and .json.</div>';
   } else {
     el.list.innerHTML = shown.map(n => {
       const body = (n.text||"").split("\n").slice(1).join(" ").trim();
@@ -547,7 +547,7 @@ function toggleLineMarker(kind){
 
 /* ============ google drive ============
    Uses the drive.file scope, which only ever grants access to files
-   this app itself created — never the rest of the user's Drive. */
+   this app itself created: never the rest of the user's Drive. */
 const GOOGLE_CLIENT_ID = "678128922768-msabi6gv91lp4q5dpmk1819711c7khhh.apps.googleusercontent.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 let tokenClient = null;
@@ -560,7 +560,7 @@ try { driveFolderId = localStorage.getItem("ledger:driveFolderId") || null; } ca
 
 function updateDriveUI(connected){
   el.drive.classList.toggle("on", connected);
-  const label = connected ? "Google Drive connected — click to disconnect" : "Connect Google Drive";
+  const label = connected ? "Google Drive connected, click to disconnect" : "Connect Google Drive";
   el.drive.setAttribute("aria-label", label);
   el.drive.title = label;
 }
@@ -590,7 +590,7 @@ function ensureDrive(interactive){
     let settled = false;
     const done = ok => { if (settled) return; settled = true; clearTimeout(timer); resolve(ok); };
     const timer = setTimeout(() => {
-      if (interactive) toast("Couldn't reach Google — check your popup blocker");
+      if (interactive) toast("Couldn't reach Google, check your popup blocker");
       done(false);
     }, 25000);
     tokenClient.callback = resp => {
@@ -729,7 +729,7 @@ async function driveSyncNow(){
       try { localStorage.setItem("ledger:driveFileId", driveFileId); } catch(e){}
     }
   } catch(e){
-    toast("Drive sync failed — will retry");
+    toast("Drive sync failed, will retry");
   }
 }
 
@@ -845,7 +845,7 @@ function noteHTML(n){
   <div class="stamp"><span>${esc(d.toLocaleString())}</span><i>/</i><span>${bytes(size(n.text))}</span></div>
 </header>
 <article>${md(n.text)}</article>
-<footer>Self-contained file — no network, no scripts required to read it.<br>
+<footer>Self-contained file, no network, no scripts required to read it.<br>
 Drop it back into Ledger to restore the note.</footer>
 </div>
 ${payload({kind:"ledger", version:1, notes:[n]})}
@@ -865,7 +865,7 @@ function bookHTML(list){
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Notebook — ${sorted.length} notes</title>
+<title>Notebook: ${sorted.length} notes</title>
 <style>${CSS_DOC}</style></head>
 <body><div class="sheet">
 <header>
@@ -1227,7 +1227,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) persi
     notes = [{
       id: uid(),
       created: Date.now(), updated: Date.now(),
-      text: "# Read me first\n\nThis is Ledger. Notes live on this device — no account, no server.\n\n## Getting a note onto another device\n\nHit **Export** on any note and pick the web page option. You get one `.html` file that:\n\n- opens in any browser, on any device, with no app installed\n- keeps its formatting and works with no network\n- can be dropped back into Ledger to restore the note exactly\n\nSo the file you send someone is the same file you'd use as a backup.\n\n## Bringing things in\n\nDrag a file onto this window, or use the import button up top. Ledger reads:\n\n- `.html` it exported before\n- `.json` backups\n- any `.md` or `.txt` file\n\n## Writing\n\nMarkdown works: `#` headings, `**bold**`, `*italic*`, lists, `> quotes`, and fenced code blocks.\n\n- [x] Formatting shows up in exports\n- [ ] Delete this note whenever you like\n\n## Shortcuts\n\n```\nCtrl/Cmd + J    new note\nCtrl/Cmd + K    search\nCtrl/Cmd + S    export current note\n```\n"
+      text: "# Read me first\n\nThis is Ledger. Notes live on this device, no account, no server.\n\n## Getting a note onto another device\n\nHit **Export** on any note and pick the web page option. You get one `.html` file that:\n\n- opens in any browser, on any device, with no app installed\n- keeps its formatting and works with no network\n- can be dropped back into Ledger to restore the note exactly\n\nSo the file you send someone is the same file you'd use as a backup.\n\n## Bringing things in\n\nDrag a file onto this window, or use the import button up top. Ledger reads:\n\n- `.html` it exported before\n- `.json` backups\n- any `.md` or `.txt` file\n\n## Writing\n\nMarkdown works: `#` headings, `**bold**`, `*italic*`, lists, `> quotes`, and fenced code blocks.\n\n- [x] Formatting shows up in exports\n- [ ] Delete this note whenever you like\n\n## Shortcuts\n\n```\nCtrl/Cmd + J    new note\nCtrl/Cmd + K    search\nCtrl/Cmd + S    export current note\n```\n"
     }];
     await persist();
   }

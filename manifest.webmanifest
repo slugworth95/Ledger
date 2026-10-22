@@ -1,5 +1,5 @@
 {
-  "name": "Ledger — portable notes",
+  "name": "Ledger: portable notes",
   "short_name": "Ledger",
   "description": "Notes that leave as one self-contained file any browser can read.",
   "start_url": "./index.html",

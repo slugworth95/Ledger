@@ -1,4 +1,4 @@
-/* Ledger service worker — cache first, so the app opens with no network. */
+/* Ledger service worker: cache first, so the app opens with no network. */
 const CACHE = "ledger-v2";
 const SHELL = [
   "./",

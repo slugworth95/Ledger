@@ -7,7 +7,7 @@ self-contained `.html` file any browser can open.
 
 ### What you get
 
-- **One file, no build step.** `index.html` is the entire app — no bundler, no
+- **One file, no build step.** `index.html` is the entire app, no bundler, no
   dependencies, no npm install.
 - **Installable and offline.** A service worker caches the shell, so it opens
   with no network. Add it to your home screen and it runs like an app.
@@ -21,7 +21,7 @@ self-contained `.html` file any browser can open.
   open last.
 - **Light and dark themes.**
 - **Optional Google Drive.** Auto-save and export to a Drive folder, and import
-  back from it. Entirely opt-in — the app has no server of its own.
+  back from it. Entirely opt-in, the app has no server of its own.
 - **Import** from `.html`, `.md`, `.txt`, and `.json`, including as a registered
   file handler once installed.
 
@@ -42,7 +42,7 @@ Then open http://localhost:8088. See the README for Caddy and nginx configs.
 
 ### Notes
 
-- Storage is local to each browser. There is no sync — see the README for the
+- Storage is local to each browser. There is no sync, see the README for the
   Syncthing/Nextcloud workarounds and where a backend would slot in.
 - Bump `CACHE` in `sw.js` whenever you change files, or the old version keeps
   getting served.
